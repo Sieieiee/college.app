@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 from bs4 import BeautifulSoup
-
+from flask_cors import CORS
 app = Flask(__name__)
-
+CORS(app, resources={r"/api/*": {"origins": "https://college-app-38q6.onrender.com/"}})
 @app.route('/')
 def index():
     return render_template('index.html')
