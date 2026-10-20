@@ -167,7 +167,7 @@
 
         try {
             // Отправляем запрос на наш Python-сервер
-            const response = await fetch('/api/login_and_fetch', {
+            const response = await fetch('https://college-app-38q6.onrender.com/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: user, password: pass })
