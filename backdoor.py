@@ -17,11 +17,7 @@ def login_and_fetch():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    
-    # ID группы по умолчанию (для расписания). Позже мы научимся выбирать её в приложении.
     group_id = '111-14' 
-    
-    # Получаем СЕГОДНЯШНЮЮ дату в формате ДД-ММ-ГГГГ (например, 20-10-2026)
     date_str = datetime.now().strftime("%d-%m-%Y")
 
     if not username or not password:
@@ -33,29 +29,35 @@ def login_and_fetch():
         "Referer": "https://www.uc.osu.ru/"
     }
 
-    # ==========================================
-    # 1. ПОЛУЧЕНИЕ ОЦЕНОК (ВСЕХ ПРЕДМЕТОВ)
-    # ==========================================
     grades_data = []
     average = 0.0
     
     try:
         hashed_pass = hashlib.sha1(password.encode('utf-8')).hexdigest()
-        login_url = "https://journal.uc.osu.ru/region_pou_secured/region.cgi/login" 
+        
+        # ВАЖНО: Исправлен URL логина (region.ogi вместо region.cgi)
+        login_url = "https://journal.uc.osu.ru/region_pou_secured/region.ogi/login" 
         grades_url = "https://journal.uc.osu.ru/region_pou_secured/region.cgi/journal.och?page=18&marks=1"
         
         session = requests.Session()
         
+        print(f"[*] Попытка входа для {username}...")
         login_resp = session.post(login_url, data={"username": username, "userpass": hashed_pass, "enter": "Вход"}, headers=headers, timeout=10)
+        print(f"[*] Статус входа: {login_resp.status_code}")
         
         if login_resp.status_code == 200:
+            print("[*] Вход успешен, скачиваем оценки...")
             grades_resp = session.get(grades_url, headers=headers, timeout=10)
-            grades_resp.encoding = 'cp1251' 
+            
+            # Пробуем угадать кодировку автоматически
+            grades_resp.encoding = grades_resp.apparent_encoding 
+            print(f"[*] Используемая кодировка: {grades_resp.encoding}")
             
             soup = BeautifulSoup(grades_resp.text, "html.parser")
             table_container = soup.find("div", class_="tableContainer")
             
             if table_container:
+                print("[*] Таблица оценок найдена!")
                 rows = table_container.find_all("tr")
                 total_marks = []
                 
@@ -65,32 +67,34 @@ def login_and_fetch():
                         subject = tds[0].get_text(strip=True)
                         marks_str = tds[1].get_text(strip=True)
                         
-                        # Пропускаем заголовки и пустые строки
                         if subject == "Дисциплина" or not marks_str or subject == "":
                             continue
                             
-                        # Собираем все цифры для среднего балла
                         marks = [int(m) for m in marks_str.split() if m.isdigit()]
                         if marks:
                             total_marks.extend(marks)
                             grades_data.append({
                                 "subject": subject,
-                                "date": "", # Дат в этой таблице нет
-                                "grade": marks_str # Передаем как строку "5 4 5"
+                                "date": "", 
+                                "grade": marks_str 
                             })
                             
                 if total_marks:
                     average = round(sum(total_marks) / len(total_marks), 2)
+                    print(f"[*] Найдено предметов: {len(grades_data)}. Средний балл: {average}")
+            else:
+                print("[!] Таблица tableContainer НЕ найдена. Возможно, неверный пароль или сайт отдал капчу.")
+        else:
+            print(f"[!] Ошибка входа. Сервер вернул статус: {login_resp.status_code}")
+            
     except Exception as e:
-        print(f"Ошибка оценок: {e}")
+        print(f"❌ Ошибка оценок: {e}")
 
-    # Если логин не прошел, покажем ошибку
+    # Если ничего не нашли, возвращаем ошибку
     if not grades_data:
         grades_data = [{"subject": "Ошибка входа или нет оценок", "date": "", "grade": "-"}]
 
-    # ==========================================
-    # 2. ПОЛУЧЕНИЕ РАСПИСАНИЯ (НА СЕГОДНЯ)
-    # ==========================================
+    # РАСПИСАНИЕ
     schedule_data = []
     schedule_url = "https://www.uc.osu.ru/generate_data.php"
     payload_schedule = {"type": 1, "data": date_str, "id": group_id}
@@ -106,7 +110,6 @@ def login_and_fetch():
             for row in rows:
                 cells = row.find_all(["td", "th"])
                 row_text = [cell.get_text(separator=" | ", strip=True) for cell in cells]
-                # Пропускаем пустые строки
                 if any(row_text):
                     schedule_data.append(row_text)
     except Exception as e:
