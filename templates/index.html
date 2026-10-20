@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Электронный журнал</title>
+    <style>
+        /* CSS-переменные для темной/светлой темы */
+        :root {
+            --bg-color: #f2f2f7; --card-bg: #ffffff; --text-main: #1c1c1e;
+            --text-muted: #8e8e93; --border-color: #e5e5ea;
+            --header-bg: rgba(255,255,255,0.95); --tabbar-bg: rgba(255,255,255,0.95);
+        }
+        [data-theme="dark"] {
+            --bg-color: #000000; --card-bg: #1c1c1e; --text-main: #ffffff;
+            --text-muted: #8e8e93; --border-color: #38383a;
+            --header-bg: rgba(28,28,30,0.95); --tabbar-bg: rgba(28,28,30,0.95);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s, color 0.3s; }
+        body { background-color: var(--bg-color); height: 100vh; width: 100vw; overflow: hidden; }
+        .app-container { background: var(--card-bg); width: 100%; height: 100vh; display: flex; flex-direction: column; position: relative; }
+        
+        /* Экран логина */
+        .login-screen { padding: 40px 30px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; background: var(--card-bg); }
+        .login-screen h1 { font-size: 28px; margin-bottom: 10px; color: var(--text-main); font-weight: 700; }
+        .login-screen p { color: var(--text-muted); margin-bottom: 30px; font-size: 15px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group input { width: 100%; padding: 16px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); border-radius: 12px; font-size: 16px; outline: none; }
+        .btn { width: 100%; padding: 16px; background: #007aff; color: #fff; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        .error-text { color: #ff3b30; font-size: 14px; margin-top: 15px; display: none; }
+
+        /* Главный экран */
+        .main-screen { display: none; height: 100%; flex-direction: column; background: var(--bg-color); }
+        .header { padding: 20px 20px 15px 20px; display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); border-bottom: 1px solid var(--border-color); z-index: 10; }
+        .header h2 { font-size: 22px; font-weight: 700; color: var(--text-main); }
+        .header-actions { display: flex; gap: 15px; align-items: center; }
+        .icon-btn { background: none; border: none; cursor: pointer; color: var(--text-main); display: flex; align-items: center; justify-content: center; }
+        .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+        .logout-btn { background: none; border: none; color: #ff3b30; font-size: 16px; font-weight: 500; cursor: pointer; }
+
+        .content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 90px; }
+        
+        /* Средний балл */
+        .gpa-card { background: linear-gradient(135deg, #007aff, #00c6ff); border-radius: 16px; padding: 20px; color: #fff; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,122,255,0.3); }
+        .gpa-info h3 { font-size: 16px; font-weight: 500; opacity: 0.9; margin-bottom: 5px; }
+        .gpa-value { font-size: 36px; font-weight: 700; }
+
+        /* Карточки */
+        .item-card { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); }
+        .item-info h3 { font-size: 16px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+        .item-info p { font-size: 14px; color: var(--text-muted); }
+        .grade-value { font-size: 26px; font-weight: 700; color: #34c759; }
+        .time-value { font-weight: 700; color: #007aff; font-size: 16px; width: 40px; }
+
+        /* Нижнее меню */
+        .tabbar { position: absolute; bottom: 0; width: 100%; height: 80px; background: var(--tabbar-bg); border-top: 1px solid var(--border-color); display: none; justify-content: space-around; align-items: center; padding-bottom: 15px; backdrop-filter: blur(10px); }
+        .tab-btn { background: none; border: none; display: flex; flex-direction: column; align-items: center; font-size: 12px; color: var(--text-muted); cursor: pointer; width: 50%; }
+        .tab-btn.active { color: #007aff; font-weight: 600; }
+        .tab-btn svg { margin-bottom: 4px; width: 26px; height: 26px; fill: currentColor; }
+
+        /* Лоадер */
+        .loading { display: none; text-align: center; color: #007aff; margin-top: 20px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- ЭКРАН ЛОГИНА -->
+    <div id="loginScreen" class="login-screen">
+        <h1>Электронный журнал</h1>
+        <p>Университетский колледж ОГУ</p>
+        <!-- Убрали автозаполнение (value) -->
+        <div class="input-group"><input type="text" id="username" placeholder="Логин"></div>
+        <div class="input-group"><input type="password" id="password" placeholder="Пароль"></div>
+        <button class="btn" id="loginBtn" onclick="login()">Войти</button>
+        <div id="errorMsg" class="error-text"></div>
+        <div id ="loading" class="loading">Загрузка данных...</div>
+    </div>
+
+    <!-- ОСНОВНОЙ ЭКРАН -->
+    <div id="mainScreen" class="main-screen">
+        <div class="header">
+            <h2 id="pageTitle">Оценки</h2>
+            <div class="header-actions">
+                <button class="icon-btn" id="themeToggle" onclick="toggleTheme()">
+                    <svg id="themeIcon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+                </button>
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- ВКЛАДКА ОЦЕНКИ -->
+            <div id="gradesTab">
+                <div class="gpa-card">
+                    <div class="gpa-info">
+                        <h3>Средний балл</h3>
+                        <p>За текущий семестр</p>
+                    </div>
+                    <div class="g24pa-value" id="gpaValue">0.0</div"><>
+                </div>
+                <div id="gradesListpath"></div>
+            </div>
+            
+            <!-- ВКЛАДКА РА dСПИСАНИЕ -->
+            <div id="="scheduleTab" style="display: none;">
+                <div id="scheduleList"></div>
+            </div>
+        </div>
+        
+        <!-- МЕНЮ -->
+        <div id="tabbar" class="tabbar">
+            <button class="tab-btn active" onclick="switchTab('grades')">
+                <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                Оценки
+            </button>
+            <button class="tab-btn" onclick="switchTab('schedule')">
+                <svg viewBox="0 0 24M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                Расписание
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- ЛОГИКА ТЕМЫ ---
+    const themeToggleBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+    }
+
+    function updateThemeIcon(theme) {
+        if (theme === 'light') {
+            themeIcon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
+        } else {
+            themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/>';
+        }
+    }
+
+    // --- ЛОГИКА ВХОДА И ЗАПРОСА К PYTHON ---
+    async function login() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        const btn = document.getElementById('loginBtn');
+        const loading = document.getElementById('loading');
+        const errorMsg = document.getElementById('errorMsg');
+
+        if(!user || !pass) {
+            errorMsg.innerText = "Заполните логин и пароль";
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        btn.style.display = 'none';
+        loading.style.display = 'block';
+        errorMsg.style.display = 'none';
+
+        try {
+            // Отправляем запрос на наш Python-сервер
+            const response = await fetch('/api/login_and_fetch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Прячем экран входа, показываем главный
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainScreen').style.display = 'flex';
+                document.getElementById('tabbar').style.display = 'flex';
+                
+                // Отрисовываем данные, которые прислал Python
+                document.getElementById('gpaValue').innerText = data.average;
+                renderGrades(data.grades);
+                renderSchedule(data.schedule);
+            } else {
+                errorMsg.innerText = data.message;
+                errorMsg.style.display = 'block';
+            }
+        } catch (e) {
+            errorMsg.innerText = "Ошибка соединения с сервером.";
+            errorMsg.style.display = 'block';
+        } finally {
+            btn.style.display = 'block';
+            loading.style.display = 'none';
+        }
+    }
+
+    // --- ОТРИСОВКА ДАННЫХ ---
+    function renderGrades(grades) {
+        const list = document.getElementById('gradesList');
+        list.innerHTML = ''; 
+        grades.forEach(g => {
+            list.innerHTML += `
+                <div class="item-card">
+                    <div class="item-info">
+                        <h3>${g.subject}</h3>
+                        <p>${g.date}</p>
+                    </div>
+                    <div class="grade-value">${g.grade}</div>
+                </div>`;
+        });
+    }
+
+    function renderSchedule(schedule) {
+        const list = document.getElementById('scheduleList');
+        list.innerHTML = ''; 
+        // Если данных нет
+        if(!schedule || schedule.length === 0) {
+            list.innerHTML = '<p style="text-align:center; color:gray; margin-top:20px;">Расписание пусто</p>';
+            return;
+        }
+        
+        schedule.forEach(s => {
+            // Ожидаем формат: [номер, предмет, преподаватель, кабинет]
+            list.innerHTML += `
+                <div class="item-card">
+                    <div class="time-value">${s[0] || ''}</div>
+                    <div class="item-info" style="flex:1;">
+                        <h3>${s[1] || 'Предмет'}</h3>
+                        <p>${s[2] || ''} ${s[3] ? '| Ауд. ' + s[3] : ''}</p>
+                    </div>
+                </div>`;
+        });
+    }
+
+    // --- ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ---
+   function switchTab(tabName) {
+        const gradesTab = document.getElementById('gradesTab');
+        const scheduleTab = document.getElementById('scheduleTab');
+        const btnGrades = document.getElementById('btnGrades');
+        const btnSchedule = document.getElementById('btnSchedule');
+        const pageTitle = document.getElementById('pageTitle');
+
+        // Прячем всё
+        if(gradesTab) gradesTab.style.display = 'none';
+        if(scheduleTab) scheduleTab.style.display = 'none';
+        if(btnGrades) btnGrades.classList.remove('active');
+        if(btnSchedule) btnSchedule.classList.remove('active');
+        
+        // Показываем нужное
+        if (tabName === 'grades') {
+            if(gradesTab) gradesTab.style.display = 'block';
+            if(pageTitle) pageTitle.innerText = 'Оценки';
+            if(btnGrades) btnGrades.classList.add('active');
+        } else {
+            if(scheduleTab) scheduleTab.style.display = 'block';
+            if(pageTitle) pageTitle.innerText = 'Расписание';
+            if(btnSchedule) btnSchedule.classList.add('active');
+        }
+    }
+
+    function logout() {
+        // Очищаем поля при выходе
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('mainScreen').style.display = 'none';
+        document.getElementById('tabbar').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+    }
+</script>
+
+</body>
+</html>
