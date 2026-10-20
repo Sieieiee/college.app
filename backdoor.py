@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "https://college-app-38q6.onrender.com/"}})
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 @app.route('/')
 def index():
     return render_template('index.html')
