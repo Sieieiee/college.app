@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Электронный журнал</title>
     <style>
-        /* CSS-переменные для темной/светлой темы */
         :root {
             --bg-color: #f2f2f7; --card-bg: #ffffff; --text-main: #1c1c1e;
             --text-muted: #8e8e93; --border-color: #e5e5ea;
@@ -50,11 +49,11 @@
         .item-card { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); }
         .item-info h3 { font-size: 16px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
         .item-info p { font-size: 14px; color: var(--text-muted); }
-        .grade-value { font-size: 26px; font-weight: 700; color: #34c759; }
+        .grade-value { font-size: 20px; font-weight: 700; color: #34c759; text-align: right; max-width: 50%; }
         .time-value { font-weight: 700; color: #007aff; font-size: 16px; width: 40px; }
 
         /* Нижнее меню */
-        .tabbar { position: absolute; bottom: 0; width: 100%; height: 80px; background: var(--tabbar-bg); border-top: 1px solid var(--border-color); display: none; justify-content: space-around; align-items: center; padding-bottom: 15px; backdrop-filter: blur(10px); }
+        .tabbar { position: absolute; bottom: 0; width: 100%; height: 80px; background: var(--tabbar-bg); border-top: 1px solid var(--border-color); display: none; justify-content: space-around; align-items: center; padding-bottom: 15px; backdrop-filter: blur(10px); z-index: 999; }
         .tab-btn { background: none; border: none; display: flex; flex-direction: column; align-items: center; font-size: 12px; color: var(--text-muted); cursor: pointer; width: 50%; }
         .tab-btn.active { color: #007aff; font-weight: 600; }
         .tab-btn svg { margin-bottom: 4px; width: 26px; height: 26px; fill: currentColor; }
@@ -70,12 +69,11 @@
     <div id="loginScreen" class="login-screen">
         <h1>Электронный журнал</h1>
         <p>Университетский колледж ОГУ</p>
-        <!-- Убрали автозаполнение (value) -->
         <div class="input-group"><input type="text" id="username" placeholder="Логин"></div>
         <div class="input-group"><input type="password" id="password" placeholder="Пароль"></div>
         <button class="btn" id="loginBtn" onclick="login()">Войти</button>
         <div id="errorMsg" class="error-text"></div>
-        <div id ="loading" class="loading">Загрузка данных...</div>
+        <div id="loading" class="loading">Загрузка... Пожалуйста, подождите до 1 минуты (сервер просыпается).</div>
     </div>
 
     <!-- ОСНОВНОЙ ЭКРАН -->
@@ -98,25 +96,25 @@
                         <h3>Средний балл</h3>
                         <p>За текущий семестр</p>
                     </div>
-                    <div class="g24pa-value" id="gpaValue">0.0</div"><>
+                    <div class="gpa-value" id="gpaValue">0.0</div>
                 </div>
-                <div id="gradesListpath"></div>
+                <div id="gradesList"></div>
             </div>
             
-            <!-- ВКЛАДКА РА dСПИСАНИЕ -->
-            <div id="="scheduleTab" style="display: none;">
+            <!-- ВКЛАДКА РАСПИСАНИЕ -->
+            <div id="scheduleTab" style="display: none;">
                 <div id="scheduleList"></div>
             </div>
         </div>
         
         <!-- МЕНЮ -->
         <div id="tabbar" class="tabbar">
-            <button class="tab-btn active" onclick="switchTab('grades')">
+            <button type="button" class="tab-btn active" id="btnGrades" onclick="switchTab('grades')">
                 <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
                 Оценки
             </button>
-            <button class="tab-btn" onclick="switchTab('schedule')">
-                <svg viewBox="0 0 24M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+            <button type="button" class="tab-btn" id="btnSchedule" onclick="switchTab('schedule')">
+                <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
                 Расписание
             </button>
         </div>
@@ -125,29 +123,28 @@
 
 <script>
     // --- ЛОГИКА ТЕМЫ ---
-    const themeToggleBtn = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
+    
+    if (savedTheme === 'dark') {
+        themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/>';
+    }
 
     function toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
-        updateThemeIcon(newTheme);
-    }
-
-    function updateThemeIcon(theme) {
-        if (theme === 'light') {
+        
+        if (newTheme === 'light') {
             themeIcon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
         } else {
             themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/>';
         }
     }
 
-    // --- ЛОГИКА ВХОДА И ЗАПРОСА К PYTHON ---
+    // --- ЛОГИКА ВХОДА (ВСТАВЛЕНА ВАША ССЫЛКА НА RENDER) ---
     async function login() {
         const user = document.getElementById('username').value;
         const pass = document.getElementById('password').value;
@@ -166,31 +163,35 @@
         errorMsg.style.display = 'none';
 
         try {
-            // Отправляем запрос на наш Python-сервер
-            const response = await fetch('https://college-app-38q6.onrender.com/', {
+            // ВАША ССЫЛКА НА RENDER
+            const RENDER_URL = 'https://college-app-38q6.onrender.com/api/login_and_fetch';
+            
+            const response = await fetch(RENDER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: user, password: pass })
             });
 
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.status === 'success') {
-                // Прячем экран входа, показываем главный
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainScreen').style.display = 'flex';
                 document.getElementById('tabbar').style.display = 'flex';
                 
-                // Отрисовываем данные, которые прислал Python
                 document.getElementById('gpaValue').innerText = data.average;
                 renderGrades(data.grades);
                 renderSchedule(data.schedule);
             } else {
-                errorMsg.innerText = data.message;
+                errorMsg.innerText = data.message || "Ошибка входа";
                 errorMsg.style.display = 'block';
             }
         } catch (e) {
-            errorMsg.innerText = "Ошибка соединения с сервером.";
+            errorMsg.innerText = "Ошибка соединения с сервером. Сервер просыпается. Подождите 30 секунд и нажмите Войти снова.";
             errorMsg.style.display = 'block';
         } finally {
             btn.style.display = 'block';
@@ -198,10 +199,11 @@
         }
     }
 
-    // --- ОТРИСОВКА ДАННЫХ ---
+    // --- ОТРИСОВКА ---
     function renderGrades(grades) {
         const list = document.getElementById('gradesList');
         list.innerHTML = ''; 
+        if(!grades) return;
         grades.forEach(g => {
             list.innerHTML += `
                 <div class="item-card">
@@ -217,14 +219,11 @@
     function renderSchedule(schedule) {
         const list = document.getElementById('scheduleList');
         list.innerHTML = ''; 
-        // Если данных нет
         if(!schedule || schedule.length === 0) {
             list.innerHTML = '<p style="text-align:center; color:gray; margin-top:20px;">Расписание пусто</p>';
             return;
         }
-        
         schedule.forEach(s => {
-            // Ожидаем формат: [номер, предмет, преподаватель, кабинет]
             list.innerHTML += `
                 <div class="item-card">
                     <div class="time-value">${s[0] || ''}</div>
@@ -236,34 +235,24 @@
         });
     }
 
-    // --- ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ---
-   function switchTab(tabName) {
-        const gradesTab = document.getElementById('gradesTab');
-        const scheduleTab = document.getElementById('scheduleTab');
-        const btnGrades = document.getElementById('btnGrades');
-        const btnSchedule = document.getElementById('btnSchedule');
-        const pageTitle = document.getElementById('pageTitle');
-
-        // Прячем всё
-        if(gradesTab) gradesTab.style.display = 'none';
-        if(scheduleTab) scheduleTab.style.display = 'none';
-        if(btnGrades) btnGrades.classList.remove('active');
-        if(btnSchedule) btnSchedule.classList.remove('active');
+    function switchTab(tabName) {
+        document.getElementById('gradesTab').style.display = 'none';
+        document.getElementById('scheduleTab').style.display = 'none';
+        document.getElementById('btnGrades').classList.remove('active');
+        document.getElementById('btnSchedule').classList.remove('active');
         
-        // Показываем нужное
         if (tabName === 'grades') {
-            if(gradesTab) gradesTab.style.display = 'block';
-            if(pageTitle) pageTitle.innerText = 'Оценки';
-            if(btnGrades) btnGrades.classList.add('active');
+            document.getElementById('gradesTab').style.display = 'block';
+            document.getElementById('pageTitle').innerText = 'Оценки';
+            document.getElementById('btnGrades').classList.add('active');
         } else {
-            if(scheduleTab) scheduleTab.style.display = 'block';
-            if(pageTitle) pageTitle.innerText = 'Расписание';
-            if(btnSchedule) btnSchedule.classList.add('active');
+            document.getElementById('scheduleTab').style.display = 'block';
+            document.getElementById('pageTitle').innerText = 'Расписание';
+            document.getElementById('btnSchedule').classList.add('active');
         }
     }
 
     function logout() {
-        // Очищаем поля при выходе
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
         document.getElementById('mainScreen').style.display = 'none';
@@ -271,6 +260,5 @@
         document.getElementById('loginScreen').style.display = 'flex';
     }
 </script>
-
 </body>
 </html>
