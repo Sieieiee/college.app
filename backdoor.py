@@ -1,9 +1,11 @@
 from flask import Flask, render_template, request, jsonify
-import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
 import hashlib
 from datetime import datetime
+
+# Используем curl_cffi вместо requests для обхода защиты
+from curl_cffi import requests as curl_requests
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -23,15 +25,6 @@ def login_and_fetch():
     if not username or not password:
         return jsonify({"status": "error", "message": "Введите логин и пароль"}), 400
 
-    # Более реалистичные заголовки браузера
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://journal.uc.osu.ru/",
-        "Origin": "https://journal.uc.osu.ru"
-    }
-
     grades_data = []
     average = 0.0
     
@@ -40,34 +33,32 @@ def login_and_fetch():
         login_url = "https://journal.uc.osu.ru/region_pou_secured/region.ogi/login" 
         grades_url = "https://journal.uc.osu.ru/region_pou_secured/region.cgi/journal.och?page=18&marks=1"
         
-        session = requests.Session()
+        # ВАЖНО: impersonate="chrome" копирует отпечаток Chrome
+        session = curl_requests.Session(impersonate="chrome")
         
-        # 1. "Прогрев" - сначала просто заходим на страницу, чтобы получить куки
         print("[*] Прогрев сессии (получение куки)...")
-        session.get("https://journal.uc.osu.ru/", headers=headers, timeout=10)
+        session.get("https://journal.uc.osu.ru/", timeout=10)
         
-        # 2. Теперь логинимся
         print(f"[*] Попытка входа для {username}...")
-        # Меняем заголовки для POST-запроса, как это делает браузер
-        post_headers = headers.copy()
-        post_headers["Content-Type"] = "application/x-www-form-urlencoded"
         
-        login_resp = session.post(login_url, data={"username": username, "userpass": hashed_pass, "enter": "Вход"}, headers=post_headers, timeout=10)
+        # Логинимся
+        login_resp = session.post(
+            login_url, 
+            data={"username": username, "userpass": hashed_pass, "enter": "Вход"}, 
+            timeout=15
+        )
+        
         print(f"[*] Статус входа: {login_resp.status_code}")
         
         if login_resp.status_code == 200:
             print("[*] Вход успешен, скачиваем оценки...")
-            grades_resp = session.get(grades_url, headers=headers, timeout=10)
-            
-            print(f"[DEBUG] Ответ сайта: {grades_resp.text[:300]}...")
-            
+            grades_resp = session.get(grades_url, timeout=15)
             grades_resp.encoding = 'cp1251' 
             
             soup = BeautifulSoup(grades_resp.text, "html.parser")
             table_container = soup.find("div", class_="tableContainer")
             
             if table_container:
-                # ... (парсинг таблицы остается без изменений)
                 print("[*] Таблица оценок найдена!")
                 rows = table_container.find_all("tr")
                 total_marks = []
@@ -92,20 +83,22 @@ def login_and_fetch():
                 print("[!] Таблица tableContainer НЕ найдена.")
         else:
             print(f"[!] Ошибка входа. Сервер вернул статус: {login_resp.status_code}")
+            print(f"Ответ сервера: {login_resp.text[:200]}")
             
     except Exception as e:
         print(f"❌ Ошибка оценок: {e}")
 
     if not grades_data:
-        grades_data = [{"subject": "Ошибка входа (403)", "date": "Сайт блокирует сервер", "grade": "-"}]
+        grades_data = [{"subject": "Ошибка входа", "date": "Проверьте логи", "grade": "-"}]
 
-    # РАСПИСАНИЕ
+    # РАСПИСАНИЕ (тоже через curl_cffi)
     schedule_data = []
     schedule_url = "https://www.uc.osu.ru/generate_data.php"
     payload_schedule = {"type": 1, "data": date_str, "id": group_id}
 
     try:
-        response = requests.post(schedule_url, data=payload_schedule, headers=headers, timeout=5)
+        sched_session = curl_requests.Session(impersonate="chrome")
+        response = sched_session.post(schedule_url, data=payload_schedule, timeout=10)
         response.encoding = 'utf-8' 
         soup = BeautifulSoup(response.text, "html.parser")
         table = soup.find("table", id="tabdata")
