@@ -1,5 +1,6 @@
-Flask
+flask
 flask-cors
 requests
 beautifulsoup4
-curl_cffi
+curl_cffi==0.7.4
+typing_extensions
